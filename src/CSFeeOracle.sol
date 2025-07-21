@@ -103,9 +103,12 @@ contract CSFeeOracle is
     function submitReportData(
         ReportData calldata data,
         uint256 contractVersion
-    ) external whenResumed {
+    ) external whenResumed {//@audit user entry point
+        //@audit-info Checks the sender is allowed to submit data 
         _checkMsgSenderIsAllowedToSubmitData();
+        //@audit-info checks the contract version is valid
         _checkContractVersion(contractVersion);
+        //@audit-info checks the consensus data is 
         _checkConsensusData(
             data.refSlot,
             data.consensusVersion,
@@ -113,6 +116,7 @@ contract CSFeeOracle is
             keccak256(abi.encode(data))
         );
         _startProcessing();
+        //@audit-info makes sure the consensus report is valid
         _handleConsensusReportData(data);
     }
 

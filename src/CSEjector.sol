@@ -77,35 +77,51 @@ contract CSEjector is
         uint256 startFrom,
         uint256 keysCount,
         address refundRecipient
-    ) external payable whenResumed {
+    ) external payable whenResumed { //@audit user entry point
+        //@audit-info validates the node operator is same as the msg.sender of the function call
         _onlyNodeOperatorOwner(nodeOperatorId);
-
         {
             // A key must be deposited to prevent ejecting unvetted keys that can intersect with
             // other modules.
+            //@audit-info calculate the maximum key index
             uint256 maxKeyIndex = startFrom + keysCount;
             if (
+                //@audit-info checks if the maximum key index is greater than the total deposited keys for the node operator
                 maxKeyIndex >
                 MODULE.getNodeOperatorTotalDepositedKeys(nodeOperatorId)
             ) {
+                //@audit-info reverts an error if true
                 revert SigningKeysInvalidOffset();
             }
             // A key must be non-withdrawn to restrict unlimited exit requests consuming sanity
             // checker limits, although a deposited key can be requested to exit multiple times.
             // But, it will eventually be withdrawn, so potentially malicious behaviour stops when
             // there are no active keys available
+            //@audit-info loops through all the keys and checks if they are withdrawn within the node operator
             for (uint256 i = startFrom; i < maxKeyIndex; ++i) {
+
                 if (MODULE.isValidatorWithdrawn(nodeOperatorId, i)) {
-                    revert AlreadyWithdrawn();
+                    
+
+
+
+
+
+
+
+
+
                 }
             }
         }
-
+        //@audit-info retrieves a certain public key from the node operator starting from a specified index 
         bytes memory pubkeys = MODULE.getSigningKeys(
             nodeOperatorId,
             startFrom,
             keysCount
         );
+
+        //@audit-info crates an object to hold an array of validator data with specified length
         ValidatorData[] memory exitsData = new ValidatorData[](keysCount);
         for (uint256 i; i < keysCount; ++i) {
             bytes memory pubkey = new bytes(SigningKeys.PUBKEY_LENGTH);
@@ -139,18 +155,22 @@ contract CSEjector is
         uint256 nodeOperatorId,
         uint256[] calldata keyIndices,
         address refundRecipient
-    ) external payable whenResumed {
+    ) external payable whenResumed {//@audit user entry point
+        //@audit-info validates the node operator is same as the msg.sender of the function call
         _onlyNodeOperatorOwner(nodeOperatorId);
-
+        //@audit-info stores the total deposited keys for the node operator
         uint256 totalDepositedKeys = MODULE.getNodeOperatorTotalDepositedKeys(
             nodeOperatorId
         );
+        //@audit-info initialises an array of validator data type with the length of key indices
         ValidatorData[] memory exitsData = new ValidatorData[](
             keyIndices.length
         );
+        //@audit-info loops through the key indices and checks if they are valid by seeing if any key index is greater than the total deposited keys
         for (uint256 i = 0; i < keyIndices.length; i++) {
             // A key must be deposited to prevent ejecting unvetted keys that can intersect with
             // other modules.
+            //@audit-info reverts an error if the key index is greater than the total deposited keys
             if (keyIndices[i] >= totalDepositedKeys) {
                 revert SigningKeysInvalidOffset();
             }
@@ -158,14 +178,17 @@ contract CSEjector is
             // checker limits, although a deposited key can be requested to exit multiple times.
             // But, it will eventually be withdrawn, so potentially malicious behaviour stops when
             // there are no active keys available
+            //@audit-info reverts an error if the current key index is already withdrawn
             if (MODULE.isValidatorWithdrawn(nodeOperatorId, keyIndices[i])) {
                 revert AlreadyWithdrawn();
             }
+            //@audit-info gets a public key for the current key index in the specific node operator
             bytes memory pubkey = MODULE.getSigningKeys(
                 nodeOperatorId,
                 keyIndices[i],
                 1
             );
+            //@audit-info assisgns the validator data of stakingmodule id, node operator id and public key to the exits data array
             exitsData[i] = ValidatorData({
                 stakingModuleId: STAKING_MODULE_ID,
                 nodeOperatorId: nodeOperatorId,

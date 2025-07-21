@@ -260,18 +260,20 @@ contract CSModule is
         bytes calldata publicKeys,
         bytes calldata signatures,
         ICSAccounting.PermitInput calldata permit
-    ) external whenResumed {
+    ) external whenResumed {//@audit user entry point
+        //@audit-info can the msg.sender add keys
         _checkCanAddKeys(nodeOperatorId, from);
-
+        //@audit-info stores the required bond amount that is sufficient for the next number of keys
         uint256 amount = accounting().getRequiredBondForNextKeys(
             nodeOperatorId,
             keysCount
         );
-
+        //@audit-info if the amount is not zero, deposits the stETH to the node operator from the address depending on the permit
         if (amount != 0) {
             accounting().depositStETH(from, nodeOperatorId, amount, permit);
         }
 
+        //@audit-info adds the keys and updates the depositable validator count
         _addKeysAndUpdateDepositableValidatorsCount(
             nodeOperatorId,
             keysCount,
@@ -288,18 +290,21 @@ contract CSModule is
         bytes calldata publicKeys,
         bytes calldata signatures,
         ICSAccounting.PermitInput calldata permit
-    ) external whenResumed {
+    ) external whenResumed {//@audit user entry point
+        //@audit-info checks if the msg.sender can add keys
         _checkCanAddKeys(nodeOperatorId, from);
 
+        //@audit-info stores the required bond amount that is sufficient for the next number of keys
         uint256 amount = accounting().getRequiredBondForNextKeysWstETH(
             nodeOperatorId,
             keysCount
         );
-
+        //@audit-info if the amount is not zero, deposits the wstETH to the node operator from the address depending on the permit
         if (amount != 0) {
             accounting().depositWstETH(from, nodeOperatorId, amount, permit);
         }
 
+        //@audit-info adds the keys and update the depositable validators count 
         _addKeysAndUpdateDepositableValidatorsCount(
             nodeOperatorId,
             keysCount,
@@ -312,7 +317,8 @@ contract CSModule is
     function proposeNodeOperatorManagerAddressChange(
         uint256 nodeOperatorId,
         address proposedAddress
-    ) external {
+    ) external { //@audit user enetry point
+        //@audit-info changes the address of the node operator
         NOAddresses.proposeNodeOperatorManagerAddressChange(
             _nodeOperators,
             nodeOperatorId,
@@ -323,7 +329,8 @@ contract CSModule is
     /// @inheritdoc ICSModule
     function confirmNodeOperatorManagerAddressChange(
         uint256 nodeOperatorId
-    ) external {
+    ) external { //@audit user entry point
+        //@audit-info confirms the change of the node operator address
         NOAddresses.confirmNodeOperatorManagerAddressChange(
             _nodeOperators,
             nodeOperatorId
@@ -334,7 +341,8 @@ contract CSModule is
     function proposeNodeOperatorRewardAddressChange(
         uint256 nodeOperatorId,
         address proposedAddress
-    ) external {
+    ) external { //@audit user entry point
+        //@audit-info proposes a new reward address for the node operator
         NOAddresses.proposeNodeOperatorRewardAddressChange(
             _nodeOperators,
             nodeOperatorId,
@@ -345,7 +353,8 @@ contract CSModule is
     /// @inheritdoc ICSModule
     function confirmNodeOperatorRewardAddressChange(
         uint256 nodeOperatorId
-    ) external {
+    ) external { //@audit user entry point
+        //@audit-info confirms the change of the node operator reward address
         NOAddresses.confirmNodeOperatorRewardAddressChange(
             _nodeOperators,
             nodeOperatorId
@@ -353,7 +362,8 @@ contract CSModule is
     }
 
     /// @inheritdoc ICSModule
-    function resetNodeOperatorManagerAddress(uint256 nodeOperatorId) external {
+    function resetNodeOperatorManagerAddress(uint256 nodeOperatorId) external {//@audit user entry point
+        //@audit-info resets the node operator manager address
         NOAddresses.resetNodeOperatorManagerAddress(
             _nodeOperators,
             nodeOperatorId
@@ -364,7 +374,8 @@ contract CSModule is
     function changeNodeOperatorRewardAddress(
         uint256 nodeOperatorId,
         address newAddress
-    ) external {
+    ) external {//@audit user entry point
+        //@audit-info changes the node operator reward address
         NOAddresses.changeNodeOperatorRewardAddress(
             _nodeOperators,
             nodeOperatorId,
@@ -456,7 +467,7 @@ contract CSModule is
     /// @inheritdoc IStakingModule
     /// @dev This method is not used in CSM, hence it does nothing
     /// @dev NOTE: No role checks because of empty body to save bytecode.
-    function onExitedAndStuckValidatorsCountsUpdated() external {
+    function onExitedAndStuckValidatorsCountsUpdated() external {//@audit user entry point
         // solhint-disable-previous-line no-empty-blocks
         // Nothing to do, rewards are distributed by a performance oracle.
     }
@@ -531,15 +542,18 @@ contract CSModule is
         uint256 nodeOperatorId,
         uint256 startIndex,
         uint256 keysCount
-    ) external {
+    ) external { //@audit user entry point
+        //@audit-info validates the node operator manager is valid and matching the node operator
         _onlyNodeOperatorManager(nodeOperatorId, msg.sender);
         NodeOperator storage no = _nodeOperators[nodeOperatorId];
 
+        //@audit-info checks if the signing key is valid
         if (startIndex < no.totalDepositedKeys) {
             revert SigningKeysInvalidOffset();
         }
 
         // solhint-disable-next-line func-named-parameters
+        //@audit-info stores the new total keys count after removing a specifc number of keys
         uint256 newTotalSigningKeys = SigningKeys.removeKeysSigs(
             nodeOperatorId,
             startIndex,
@@ -550,24 +564,32 @@ contract CSModule is
         // The Node Operator is charged for the every removed key. It's motivated by the fact that the DAO should cleanup
         // the queue from the empty batches related to the Node Operator. It's possible to have multiple batches with only one
         // key in it, so it means the DAO should be able to cover removal costs for as much batches as keys removed in this case.
+        //@audit-info gets the curveID for the node operator
         uint256 curveId = accounting().getBondCurveId(nodeOperatorId);
+        //@audit-info gets the key removal charge for the curve * keysCount
         uint256 amountToCharge = PARAMETERS_REGISTRY.getKeyRemovalCharge(
             curveId
         ) * keysCount;
+        //@audit-info if the amount charge is not zero, charge the fee for the node operator
         if (amountToCharge != 0) {
             accounting().chargeFee(nodeOperatorId, amountToCharge);
+            //@audit-info emits the event for the key removal charge
             emit KeyRemovalChargeApplied(nodeOperatorId);
         }
 
         // @dev No need to safe cast due to checks in the func above
+        //@audit-info 
         no.totalAddedKeys = uint32(newTotalSigningKeys);
         emit TotalSigningKeysCountChanged(nodeOperatorId, newTotalSigningKeys);
 
         // @dev No need to safe cast due to checks in the func above
+        //@audit-info the node operator new total vetted keys is safe cast to uint32
         no.totalVettedKeys = uint32(newTotalSigningKeys);
+        //@audit-info emits the event for the new total vetted keys count
         emit VettedSigningKeysCountChanged(nodeOperatorId, newTotalSigningKeys);
 
         // Nonce is updated below due to keys state change
+        //@audit-info updates the depositable validators count
         _updateDepositableValidatorsCount({
             nodeOperatorId: nodeOperatorId,
             incrementNonceIfUpdated: false
@@ -576,7 +598,8 @@ contract CSModule is
     }
 
     /// @inheritdoc ICSModule
-    function updateDepositableValidatorsCount(uint256 nodeOperatorId) external {
+    function updateDepositableValidatorsCount(uint256 nodeOperatorId) external {//@audit user entry point
+        //@audit-info updates the depositable validators count
         _updateDepositableValidatorsCount({
             nodeOperatorId: nodeOperatorId,
             incrementNonceIfUpdated: true
@@ -584,33 +607,42 @@ contract CSModule is
     }
 
     /// @inheritdoc ICSModule
-    function migrateToPriorityQueue(uint256 nodeOperatorId) external {
+    function migrateToPriorityQueue(uint256 nodeOperatorId) external {//@audit user entry point
+        //@audit-info stores a specific node operator in storage
         NodeOperator storage no = _nodeOperators[nodeOperatorId];
 
+        //@audit-info checks if the node operator already use the priority queue
         if (no.usedPriorityQueue) {
             revert PriorityQueueAlreadyUsed();
         }
 
+        //@audit-info gets the curve id for the node operator
         uint256 curveId = accounting().getBondCurveId(nodeOperatorId);
+        //@audit-info gets the queue confifuration for the curve id
         (uint32 priority, uint32 maxDeposits) = PARAMETERS_REGISTRY
             .getQueueConfig(curveId);
-
+        
+        //@audit-info check if the queue priority is the lowest, if so it's not eligible for the priority queue
         if (priority == QUEUE_LOWEST_PRIORITY) {
             revert NotEligibleForPriorityQueue();
         }
 
+        //@audit-info checks how many keys the node operator has in queue if zero, then reverts
         uint32 enqueued = no.enqueuedCount;
         if (enqueued == 0) {
             revert NoQueuedKeysToMigrate();
         }
-
+        //@audit-info checks if the maximum deposits is less than the total deposited keys, if so reverts
         uint32 deposited = no.totalDepositedKeys;
         if (maxDeposits <= deposited) {
             revert PriorityQueueMaxDepositsUsed();
         }
 
+        //@audit-info stores the smaller of the amount of free slots and the queue 
         uint32 toMigrate = uint32(Math.min(enqueued, maxDeposits - deposited));
+        //@audit-info enqueues the node operator keys based on the priority
         _enqueueNodeOperatorKeys(nodeOperatorId, priority, toMigrate);
+        //@audit-info sets the used priority queue flag to true
         no.usedPriorityQueue = true;
         _incrementModuleNonce();
 
@@ -700,8 +732,10 @@ contract CSModule is
     /// @inheritdoc ICSModule
     function compensateELRewardsStealingPenalty(
         uint256 nodeOperatorId
-    ) external payable {
+    ) external payable { //@audit user entry point
+        //@audit-info validates the node operator manager is the same as msg.sender
         _onlyNodeOperatorManager(nodeOperatorId, msg.sender);
+        //@audit-info checks if the node  
         accounting().compensateLockedBondETH{ value: msg.value }(
             nodeOperatorId
         );

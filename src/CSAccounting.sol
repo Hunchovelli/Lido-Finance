@@ -180,8 +180,10 @@ contract CSAccounting is
     }
 
     /// @inheritdoc ICSAccounting
-    function depositETH(uint256 nodeOperatorId) external payable whenResumed {
+    function depositETH(uint256 nodeOperatorId) external payable whenResumed { //@audit User enrty point - user can deposit ETH to the node operator
+        //@audit-info Validates the operator ID 
         _onlyExistingNodeOperator(nodeOperatorId);
+        //@audit-info Deposits eth to the node operator
         CSBondCore._depositETH(msg.sender, nodeOperatorId);
         MODULE.updateDepositableValidatorsCount(nodeOperatorId);
     }
@@ -202,10 +204,14 @@ contract CSAccounting is
         uint256 nodeOperatorId,
         uint256 stETHAmount,
         PermitInput calldata permit
-    ) external whenResumed {
+    ) external whenResumed { //@audit user entry point  
+        //@audit-info Validates the operator ID
         _onlyExistingNodeOperator(nodeOperatorId);
+        //@audit-info check if the user has permission to unwrap stETH 
         _unwrapStETHPermitIfRequired(msg.sender, permit);
+        //@audit-info Deposits specific amount of stETH to the node operator
         CSBondCore._depositStETH(msg.sender, nodeOperatorId, stETHAmount);
+        //@audit-info updates the coint of node validators that have been deposited to
         MODULE.updateDepositableValidatorsCount(nodeOperatorId);
     }
 
@@ -225,10 +231,14 @@ contract CSAccounting is
         uint256 nodeOperatorId,
         uint256 wstETHAmount,
         PermitInput calldata permit
-    ) external whenResumed {
+    ) external whenResumed {//@audit user entry point
+        //@audit-info Validates the operator ID
         _onlyExistingNodeOperator(nodeOperatorId);
+        //@audit-info check if the user has permission to unwrap wstETH 
         _unwrapWstETHPermitIfRequired(msg.sender, permit);
+        //@audit-info Deposits specific amount of wstETH to the node operator
         CSBondCore._depositWstETH(msg.sender, nodeOperatorId, wstETHAmount);
+        //@audit-info updates the count of the depositbale validators
         MODULE.updateDepositableValidatorsCount(nodeOperatorId);
     }
 
@@ -238,19 +248,24 @@ contract CSAccounting is
         uint256 stETHAmount,
         uint256 cumulativeFeeShares,
         bytes32[] calldata rewardsProof
-    ) external whenResumed returns (uint256 claimedShares) {
+    ) external whenResumed returns (uint256 claimedShares) { //@audit User entry point 
+        //@audit-info gets the specific node operator management properties
         NodeOperatorManagementProperties memory no = MODULE
             .getNodeOperatorManagementProperties(nodeOperatorId);
+        //@audit-info returns the node operator manager or the reward address
         _onlyNodeOperatorManagerOrRewardAddresses(no);
-
+        //@audit-info checks if there is rewards in the list
         if (rewardsProof.length != 0) {
+            //@audit-info pulls the cumulative fee rewards from the node operator and out of the rewards proof
             _pullFeeRewards(nodeOperatorId, cumulativeFeeShares, rewardsProof);
         }
+        //@audit-info claims the specific amount of stETH from the node operator and the reward address and stores it as a claimedShares variable
         claimedShares = CSBondCore._claimStETH(
             nodeOperatorId,
             stETHAmount,
             no.rewardAddress
         );
+        //@audit-info 
         MODULE.updateDepositableValidatorsCount(nodeOperatorId);
     }
 
@@ -260,14 +275,19 @@ contract CSAccounting is
         uint256 wstETHAmount,
         uint256 cumulativeFeeShares,
         bytes32[] calldata rewardsProof
-    ) external whenResumed returns (uint256 claimedWstETH) {
+    ) external whenResumed returns (uint256 claimedWstETH) { //@audit user entry point
+        //@audit-info retrieve the object to handle the node operator management properties
         NodeOperatorManagementProperties memory no = MODULE
             .getNodeOperatorManagementProperties(nodeOperatorId);
         _onlyNodeOperatorManagerOrRewardAddresses(no);
 
+        //@audit-info checks if there is rewards in the list
         if (rewardsProof.length != 0) {
+            //@audit-info pulls the cumulative fee rewards for the node operator and out of the rewards proof list
             _pullFeeRewards(nodeOperatorId, cumulativeFeeShares, rewardsProof);
         }
+
+        //@audit-info claims the specific amount of WstETH for that node operator and the reward address and stores it as variable on the amount claimedWstETH
         claimedWstETH = CSBondCore._claimWstETH(
             nodeOperatorId,
             wstETHAmount,
@@ -282,19 +302,25 @@ contract CSAccounting is
         uint256 stETHAmount,
         uint256 cumulativeFeeShares,
         bytes32[] calldata rewardsProof
-    ) external whenResumed returns (uint256 requestId) {
+    ) external whenResumed returns (uint256 requestId) { //@audit user entry point
+        //@audit-info retrieves the object to handle the node operator management properties
         NodeOperatorManagementProperties memory no = MODULE
             .getNodeOperatorManagementProperties(nodeOperatorId);
+        //@audit-info returns the node operator manager or reward address
         _onlyNodeOperatorManagerOrRewardAddresses(no);
-
+        //@audit-info checks if there are rewards in the list
         if (rewardsProof.length != 0) {
+            //@audit-info removes the cumulative fee rewards for the node operator and out of the rewards proof list
             _pullFeeRewards(nodeOperatorId, cumulativeFeeShares, rewardsProof);
         }
+
+        //@audit-info claims the specific amount of unstETH for that node operator and the reward address and stores it as a request ID
         requestId = CSBondCore._claimUnstETH(
             nodeOperatorId,
             stETHAmount,
             no.rewardAddress
         );
+        //@audit-info updates the node operator data at the end of the logic
         MODULE.updateDepositableValidatorsCount(nodeOperatorId);
     }
 
@@ -365,51 +391,66 @@ contract CSAccounting is
         uint256 nodeOperatorId,
         uint256 cumulativeFeeShares,
         bytes32[] calldata rewardsProof
-    ) external {
+    ) external { //@audit user entry point
+        //@audit-info Validates the operator ID as existing
         _onlyExistingNodeOperator(nodeOperatorId);
+        //@audit-info validates node operator has cumulative fee shares to extract from the rewards proof list
         _pullFeeRewards(nodeOperatorId, cumulativeFeeShares, rewardsProof);
+        //@audit-info updates the data of the depositable validatorss
         MODULE.updateDepositableValidatorsCount(nodeOperatorId);
     }
 
     /// @inheritdoc AssetRecoverer
-    function recoverERC20(address token, uint256 amount) external override {
+    function recoverERC20(address token, uint256 amount) external override {//@audit user entry point
+        //@audit-info checks if the user has the recoverer role
         _onlyRecoverer();
+        //@audit-info checks if the token is Lido
         if (token == address(LIDO)) {
+            //@audit-info reverts if the token is Lido
             revert NotAllowedToRecover();
         }
+        //@audit-info recovers the specific amount of ERC20 token
         AssetRecovererLib.recoverERC20(token, amount);
     }
 
     /// @notice Recover all stETH shares from the contract
     /// @dev Accounts for the bond funds stored during recovery
-    function recoverStETHShares() external {
+    function recoverStETHShares() external {//@audit user entry point
+        //@audit-info checks if the user has the recoverer role
         _onlyRecoverer();
+        //@audit-info calculates the share of free LIDO shares in the contract
         uint256 shares = LIDO.sharesOf(address(this)) - totalBondShares();
+        //@audit-info recovers the specific amount of LIDO shares
         AssetRecovererLib.recoverStETHShares(address(LIDO), shares);
     }
 
     /// @inheritdoc ICSAccounting
-    function renewBurnerAllowance() external {
+    
+    function renewBurnerAllowance() external {//@audit user entry point
         LIDO.approve(LIDO_LOCATOR.burner(), type(uint256).max);
     }
 
     /// @inheritdoc ICSAccounting
-    function getInitializedVersion() external view returns (uint64) {
+    function getInitializedVersion() external view returns (uint64) {//@audit user entry point
+        //@audit-info returns an initialized number 
         return _getInitializedVersion();
     }
 
     /// @inheritdoc ICSAccounting
     function getBondSummary(
         uint256 nodeOperatorId
-    ) external view returns (uint256 current, uint256 required) {
+    ) external view returns (uint256 current, uint256 required) {//@audit user entry point
+        //@audit-info gets the current bond(loan agreement) for the specific node operator and stores it as current variable
         current = CSBondCore.getBond(nodeOperatorId);
+        //@audit-info gets the required bond(loan agreement) for the specific node operator and stores it as required variable
         required = _getRequiredBond(nodeOperatorId, 0);
     }
 
     /// @inheritdoc ICSAccounting
     function getUnbondedKeysCount(
         uint256 nodeOperatorId
-    ) external view returns (uint256) {
+    ) external view returns (uint256) {//@audit user entry point
+    //@audit-info returns the unbounded key count for the specific node operator incliuding the locked bond to eject
         return
             _getUnbondedKeysCount({
                 nodeOperatorId: nodeOperatorId,
@@ -420,7 +461,8 @@ contract CSAccounting is
     /// @inheritdoc ICSAccounting
     function getUnbondedKeysCountToEject(
         uint256 nodeOperatorId
-    ) external view returns (uint256) {
+    ) external view returns (uint256) {//@audit user entry point
+      //@audit-info returns the unbounded key count for the specific node operator without including the locked bond to eject  
         return
             _getUnbondedKeysCount({
                 nodeOperatorId: nodeOperatorId,
@@ -432,7 +474,8 @@ contract CSAccounting is
     function getBondAmountByKeysCountWstETH(
         uint256 keysCount,
         uint256 curveId
-    ) external view returns (uint256) {
+    ) external view returns (uint256) {//@audit user entry point
+    //@audit-info returns the bond amount by keys count for the specific curve ID
         return
             _sharesByEth(
                 CSBondCurve.getBondAmountByKeysCount(keysCount, curveId)
@@ -443,8 +486,9 @@ contract CSAccounting is
     function getRequiredBondForNextKeysWstETH(
         uint256 nodeOperatorId,
         uint256 additionalKeys
-    ) external view returns (uint256) {
+    ) external view returns (uint256) {//@audit user entry point
         return
+        //@audit-info returns the required bond for the next keys for the specific node operator and additional keys
             _sharesByEth(
                 getRequiredBondForNextKeys(nodeOperatorId, additionalKeys)
             );
@@ -453,7 +497,8 @@ contract CSAccounting is
     /// @inheritdoc ICSAccounting
     function getClaimableBondShares(
         uint256 nodeOperatorId
-    ) external view returns (uint256) {
+    ) external view returns (uint256) {//@audit user entry point
+    //@audit-info returns the claimable bond shares for the specific node operator
         return _getClaimableBondShares(nodeOperatorId);
     }
 
@@ -462,32 +507,39 @@ contract CSAccounting is
         uint256 nodeOperatorId,
         uint256 cumulativeFeeShares,
         bytes32[] calldata rewardsProof
-    ) external view returns (uint256 claimableShares) {
+    ) external view returns (uint256 claimableShares) {//@audit user entry point
+        //@audit-info gets the fees to distribute for the specific node operator in feesToDistribute variable
         uint256 feesToDistribute = FEE_DISTRIBUTOR.getFeesToDistribute(
             nodeOperatorId,
             cumulativeFeeShares,
             rewardsProof
         );
 
+        //@audit-info gets the current bond shares for the specific node operator and stores it as current variable and the required bond shares as required variable
         (uint256 current, uint256 required) = getBondSummaryShares(
             nodeOperatorId
         );
+        //@audit-info calculates the claimable shares by adding the current bond shares and the fees to distribute
         current = current + feesToDistribute;
 
+        //@audit-info is current > required. calculates the claimable shares by subtracting the required bond shares from the current bond shares, otherwise return 0
         return current > required ? current - required : 0;
     }
 
     /// @dev TODO: Remove in the next major release
     /// @inheritdoc ICSAccounting
-    function feeDistributor() external view returns (ICSFeeDistributor) {
+    function feeDistributor() external view returns (ICSFeeDistributor) {//@audit user entry point
+        //@audit-info returns the fee distributor
         return FEE_DISTRIBUTOR;
     }
 
     /// @inheritdoc ICSAccounting
     function getBondSummaryShares(
         uint256 nodeOperatorId
-    ) public view returns (uint256 current, uint256 required) {
+    ) public view returns (uint256 current, uint256 required) {//@audit user entry point
+        //@audit-info gets the current bond shares for the specific node operator and stores it as current variable
         current = CSBondCore.getBondShares(nodeOperatorId);
+        //@audit-info gets the required bond shares for the specific node operator and stores it as required variable
         required = _getRequiredBondShares(nodeOperatorId, 0);
     }
 
@@ -495,14 +547,17 @@ contract CSAccounting is
     function getRequiredBondForNextKeys(
         uint256 nodeOperatorId,
         uint256 additionalKeys
-    ) public view returns (uint256) {
+    ) public view returns (uint256) {//@audit user entry point
+        //@audit-info gets the current bond for the specific node operator and stores it as current variable
         uint256 current = CSBondCore.getBond(nodeOperatorId);
+        //@audit-info gets the required bond for the next keys for the specific node operator and additional keys and stores it as totalRequired variable
         uint256 totalRequired = _getRequiredBond(
             nodeOperatorId,
             additionalKeys
         );
-
+        //@audit-info removes the unchecked modifier to avoid overflow
         unchecked {
+            //@audit-info returns the difference between the total required bond and the current bond if totalRequired is greater than current, otherwise returns 0
             return totalRequired > current ? totalRequired - current : 0;
         }
     }
